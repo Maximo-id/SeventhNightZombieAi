@@ -3,7 +3,10 @@
   "package": "com.sevennightzombieai.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [],
-  "mixins": [],
+  "mixins": [
+    "ZombieEntityMixin",
+    "MobEntityAccessor"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
