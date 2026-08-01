@@ -1,6 +1,6 @@
 package com.sevennightzombieai.tag;
 
-import com.sevennightzombieai.SevenNightZombieAIMod;
+import com.sevennightzombieai.SeventhNightZombieAIMod;
 import net.minecraft.block.Block;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
@@ -17,6 +17,6 @@ public final class ModBlockTags {
 
     public static final TagKey<Block> BREAKABLE_BY_ZOMBIES = TagKey.of(
             RegistryKeys.BLOCK,
-            Identifier.of(SevenNightZombieAIMod.MOD_ID, "breakable_by_zombies")
+            Identifier.of(SeventhNightZombieAIMod.MOD_ID, "breakable_by_zombies")
     );
 }

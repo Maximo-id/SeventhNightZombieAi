@@ -1,6 +1,7 @@
 package com.sevennightzombieai.mixin;
 
-import com.sevennightzombieai.SevenNightZombieAIMod;
+import com.mojang.text2speech.Narrator;
+import com.sevennightzombieai.SeventhNightZombieAIMod;
 import com.sevennightzombieai.goal.ZombieBreakBlockGoal;
 import com.sevennightzombieai.goal.ZombieRepathGoal;
 import net.minecraft.entity.ai.goal.GoalSelector;
@@ -44,11 +45,11 @@ public abstract class ZombieEntityMixin {
             if (before < DETECTION_RANGE_BLOCKS) {
                 followRange.setBaseValue(DETECTION_RANGE_BLOCKS);
             }
-            SevenNightZombieAIMod.LOGGER.info(
+            SeventhNightZombieAIMod.LOGGER.info(
                     "[AI-DEBUG] Zombie construido. followRange antes={} despues={}",
                     before, followRange.getBaseValue());
         } else {
-            SevenNightZombieAIMod.LOGGER.warn("[AI-DEBUG] Zombie construido pero followRange attribute es NULL");
+            SeventhNightZombieAIMod.LOGGER.warn("[AI-DEBUG] Zombie construido pero followRange attribute es NULL");
         }
 
         self.setStepHeight(STEP_HEIGHT_BLOCKS);
@@ -58,11 +59,17 @@ public abstract class ZombieEntityMixin {
     private void seventhNightZombieAi$addCustomGoals(CallbackInfo ci) {
         ZombieEntity self = (ZombieEntity) (Object) this;
         GoalSelector goalSelector = ((MobEntityAccessor) self).seventhNightZombieAi$getGoalSelector();
-        // Prioridad 1: el re-pathing puede tomar el control momentáneamente por
-        // sobre el ataque cuerpo a cuerpo (normalmente prioridad 2) cuando está trabado.
-        goalSelector.add(1, new ZombieRepathGoal(self));
-        // Prioridad 2: más urgente que wander, menos urgente que perseguir directo.
-        goalSelector.add(2, new ZombieBreakBlockGoal(self));
+
+        // Prioridad 1: romper bloques. Va POR ENCIMA de ZombieAttackGoal (prioridad 2
+        // en vanilla) para que cuando el zombie esté trabado contra un bloque rompible,
+        // rompa el bloque en lugar de quedarse intentando atacar al aire.
+        goalSelector.add(1, new ZombieBreakBlockGoal(self));
+
+        // Prioridad 3: re-pathfinding cuando está trabado. Menos urgente que romper
+        // bloques, pero sigue activo para dar variedad al comportamiento.
+        goalSelector.add(3, new ZombieRepathGoal(self));
+
+        Narrator SevenNightZombieAIMod = null;
         SevenNightZombieAIMod.LOGGER.info("[AI-DEBUG] Goals custom agregados a initGoals()");
     }
 }
