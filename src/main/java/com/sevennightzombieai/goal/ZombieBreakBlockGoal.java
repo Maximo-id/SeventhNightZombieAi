@@ -4,10 +4,8 @@ import com.sevennightzombieai.tag.ModBlockTags;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.mob.ZombieEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -20,7 +18,7 @@ import java.util.EnumSet;
 
 /**
  * Hace que un zombie rompa bloques "débiles" (whitelist en
- * data/sevennightzombieai/tags/blocks/breakable_by_zombies.json) cuando está
+ * data/sevennightzombieai/tags/block/breakable_by_zombies.json) cuando está
  * bloqueado en su camino hacia el jugador objetivo.
  *
  * Diseño pensado para hardware de gama baja:
@@ -48,7 +46,7 @@ public class ZombieBreakBlockGoal extends Goal {
     public ZombieBreakBlockGoal(ZombieEntity zombie) {
         this.zombie = zombie;
         this.world = zombie.getWorld();
-        this.setControls(EnumSet.of(Goal.Control.MOVE, Goal.Control.LOOK));
+        this.setControls(EnumSet.of(Goal.Control.MOVE));
     }
 
     @Override
@@ -57,9 +55,7 @@ public class ZombieBreakBlockGoal extends Goal {
             return false;
         }
 
-        // Usa el follow range del zombie en lugar de hardcodear 16
-        double followRange = this.zombie.getAttributeValue(EntityAttributes.GENERIC_FOLLOW_RANGE);
-        PlayerEntity target = this.world.getClosestPlayer(this.zombie, followRange);
+        PlayerEntity target = this.world.getClosestPlayer(this.zombie, 16.0);
         if (target == null) {
             this.resetStuckTracking();
             return false;
@@ -87,14 +83,13 @@ public class ZombieBreakBlockGoal extends Goal {
                 && this.zombie.isAlive()
                 && this.isBreakable(this.targetBlock)
                 && this.zombie.squaredDistanceTo(
-                this.targetBlock.getX() + 0.5, this.targetBlock.getY() + 0.5, this.targetBlock.getZ() + 0.5)
-                < 6.0;
+                        this.targetBlock.getX() + 0.5, this.targetBlock.getY() + 0.5, this.targetBlock.getZ() + 0.5)
+                        < 6.0;
     }
 
     @Override
     public void start() {
-        PlayerEntity target = this.world.getClosestPlayer(
-                this.zombie, this.zombie.getAttributeValue(EntityAttributes.GENERIC_FOLLOW_RANGE));
+        PlayerEntity target = this.world.getClosestPlayer(this.zombie, 16.0);
         this.targetBlock = target != null ? this.findBreakableBlockTowards(target) : null;
         this.breakingProgress = 0f;
         this.rechecksCooldown = RECHECK_COOLDOWN;
@@ -147,7 +142,7 @@ public class ZombieBreakBlockGoal extends Goal {
             if (this.zombie.age % 4 == 0) {
                 BlockState state = this.world.getBlockState(this.targetBlock);
                 serverWorld.spawnParticles(
-                        new BlockStateParticleEffect(ParticleTypes.BLOCK, state),
+                        ParticleTypes.BLOCK_CRUMBLE.of(state),
                         this.targetBlock.getX() + 0.5, this.targetBlock.getY() + 0.5, this.targetBlock.getZ() + 0.5,
                         3, 0.2, 0.2, 0.2, 0.0
                 );
@@ -179,44 +174,29 @@ public class ZombieBreakBlockGoal extends Goal {
     }
 
     /**
-     * Busca bloques rompibles alrededor del zombie, priorizando los que están
-     * en la dirección hacia el jugador y más cerca del zombie.
+     * Busca, entre los bloques adyacentes al zombie en dirección al jugador,
+     * el primero que esté en la whitelist de bloques rompibles.
      */
     private BlockPos findBreakableBlockTowards(PlayerEntity target) {
         BlockPos zombiePos = this.zombie.getBlockPos();
-        Vec3d toTarget = target.getPos().subtract(this.zombie.getPos());
+        Vec3d direction = target.getPos().subtract(this.zombie.getPos()).normalize();
 
-        BlockPos best = null;
-        double bestScore = Double.MAX_VALUE;
-
-        // Área 3x3x2 alrededor del zombie (pies y cabeza)
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                for (int dy = 0; dy <= 1; dy++) {
-                    BlockPos candidate = zombiePos.add(dx, dy, dz);
-                    if (!this.isBreakable(candidate)) {
-                        continue;
-                    }
-
-                    Vec3d toBlock = new Vec3d(
-                            candidate.getX() + 0.5,
-                            candidate.getY() + 0.5,
-                            candidate.getZ() + 0.5
-                    ).subtract(this.zombie.getPos());
-
-                    double score = toBlock.lengthSquared();
-                    // Bonus si está en dirección al jugador
-                    if (toTarget.dotProduct(toBlock) > 0) {
-                        score -= 4.0;
-                    }
-                    if (score < bestScore) {
-                        bestScore = score;
-                        best = candidate;
-                    }
+        BlockPos.Mutable checkPos = new BlockPos.Mutable();
+        // Chequea a la altura de los pies y de la cabeza, un par de bloques hacia el jugador
+        for (int step = 1; step <= 2; step++) {
+            for (int yOffset = 0; yOffset <= 1; yOffset++) {
+                checkPos.set(
+                        zombiePos.getX() + (int) Math.round(direction.x * step),
+                        zombiePos.getY() + yOffset,
+                        zombiePos.getZ() + (int) Math.round(direction.z * step)
+                );
+                BlockPos candidate = checkPos.toImmutable();
+                if (this.isBreakable(candidate)) {
+                    return candidate;
                 }
             }
         }
-        return best;
+        return null;
     }
 
     private boolean isBreakable(BlockPos pos) {
